@@ -1,0 +1,45 @@
+%{
+Author: Paul Kullmann
+BIOENG 1351/2351 Project
+%}
+
+device = serialport("/dev/cu.usbmodem101",115200);
+configureTerminator(device, "LF");
+%flush(device);
+%writeline(device, "x");  % send any character to continue setup()
+%pause(2);  % give Arduino a moment to start up
+
+
+figure(); hold on;
+grid on;
+xlabel("Sample")
+ylabel("Value")
+legend("Red", "IR", "SpO2");
+
+red = [];
+ir = [];
+spo2 = [];
+
+while true
+    if device.NumBytesAvailable > 0
+        line = readline(device);
+        data = str2double(split(line, ','));
+        disp(line)
+        disp(data)
+        try
+            red = [red, data(1)];
+            ir = [ir, data(2)];
+            spo2 = [spo2, data(3)];
+            fprintf(spo2(end))
+            
+            plot(red, 'r');
+            plot(ir, 'b');
+            ylim("tight")
+            drawnow limitrate;
+        catch
+            fprintf('error plotting')
+        end
+        
+
+    end
+end
