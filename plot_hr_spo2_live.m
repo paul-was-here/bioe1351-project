@@ -2,9 +2,11 @@
 Author: Paul Kullmann
 BIOENG 1351/2351 Project
 
-Purpose: Live plot Red & IR PPG & SpO2 from connected Arduino board. Need
-to perform peak detection to determine heartrate (included .h library is
-unreliable).
+Purpose: Live plot Red & IR PPG & SpO2 from connected Arduino board.
+To-Do: 
+- modularize this code
+- include reading of accelerometer data
+- live plot with a sliding 2-3s window?
 %}
 
 % Connect to serial port:
