@@ -4,16 +4,7 @@
   Date: October 19th, 2016
   https://github.com/sparkfun/MAX30105_Breakout
 
-  This demo shows heart rate and SPO2 levels.
-
-  It is best to attach the sensor to your finger using a rubber band or other tightening 
-  device. Humans are generally bad at applying constant pressure to a thing. When you 
-  press your finger against the sensor it varies enough to cause the blood in your 
-  finger to flow differently which causes the sensor readings to go wonky.
-
-  This example is based on MAXREFDES117 and RD117_LILYPAD.ino from Maxim. Their example
-  was modified to work with the SparkFun MAX30105 library and to compile under Arduino 1.6.11
-  Please see license file for more info.
+  * Modifications by Paul Kullmann for BIOENG 1351/2351 Project
 
   Hardware Connections (Breakoutboard to Arduino):
   -5V = 5V (3.3V is allowed)
@@ -21,9 +12,6 @@
   -SDA = A4 (or SDA)
   -SCL = A5 (or SCL)
   -INT = Not connected
- 
-  The MAX30105 Breakout can handle 5V or 3.3V I2C logic. We recommend powering the board with 5V
-  but it will also run at 3.3V.
 */
 
 #include <Wire.h>
@@ -62,11 +50,9 @@ void setup()
     while (1);
   }
 
-  //Serial.println(F("Attach sensor to finger with rubber band. Press any key to start conversion"));
-  //while (Serial.available() == 0) ; //wait until user presses a key
   Serial.read();
 
-  byte ledBrightness = 60; //Options: 0=Off to 255=50mA
+  byte ledBrightness = 120; //Options: 0=Off to 255=50mA
   byte sampleAverage = 4; //Options: 1, 2, 4, 8, 16, 32
   byte ledMode = 2; //Options: 1 = Red only, 2 = Red + IR, 3 = Red + IR + Green
   byte sampleRate = 1000; //Options: 50, 100, 200, 400, 800, 1000, 1600, 3200
@@ -90,7 +76,7 @@ void loop()
     irBuffer[i] = particleSensor.getIR();
     particleSensor.nextSample(); //We're finished with this sample so move to next sample
 
-    /*
+    /* avoid printing unnecessary data
     Serial.print(F("red="));
     Serial.print(redBuffer[i], DEC);
     Serial.print(F(", ir="));
@@ -123,8 +109,7 @@ void loop()
       irBuffer[i] = particleSensor.getIR();
       particleSensor.nextSample(); //We're finished with this sample so move to next sample
 
-      //send samples and calculation result to terminal program through UART
-      /*
+      /* no need to print this...
       Serial.print(F("red="));
       Serial.print(redBuffer[i], DEC);
       Serial.print(F(", ir="));
@@ -142,6 +127,8 @@ void loop()
       Serial.print(F(", SPO2Valid="));
       Serial.println(validSPO2, DEC);
       */
+
+      // Print red,ir,spo2 in format for reading to MATLAB
       Serial.print(redBuffer[i]);
       Serial.print(",");
       Serial.print(irBuffer[i]);
@@ -152,9 +139,15 @@ void loop()
 
 
     }
+    
+    /*
+    Paul's Note:
+    We find the heart rate algorithm included in the MAX30105 library to be inaccurate and unreliable.
+    The SpO2 algorithm seems acceptable when validated against an Apple Watch.
+    Although the algorithm in this script is still computing heart rate, we choose not to use it and instead send the PPG information to Matlab for online peak detection and processing.
+    */
 
-    //After gathering 25 new samples recalculate HR and SP02
     maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
-
+    // Note that the heart rate algorithm resides in a function of the included library.
   }
 }
