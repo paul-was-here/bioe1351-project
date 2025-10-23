@@ -40,10 +40,21 @@ while true
             fprintf("\n%f",spo2(end))
 
             if length(red) > 100
+                % Clear plots after 100 samples
                 yyaxis left;
                 cla;
                 yyaxis right;
                 cla;
+
+                fs = length(red)/(ts(end)-ts(1)); % calculate sampling rate in this buffer set
+
+                % Peak detection:
+                thres = 2*std(red);
+                [~, pkids] = findpeaks(red, 'MinPeakProminence', thres);
+                hr = 60 / mean(diff(ts(pkids)));
+                fprintf("Current heart rate: %.1f", hr)
+
+                % Clear data buffers
                 red = [];
                 ir = [];
                 spo2 = [];
