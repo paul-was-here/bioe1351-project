@@ -8,6 +8,8 @@ import os
 Author:     Paul Kullmann
 Purpose:    Record two-axis accelerometer data from Arduino for project preliminary data testing
 Modified:   10/13/25
+
+This is basically defunct since you can just read serial data in matlab, bypassing this python step
 '''
 
 data = []
