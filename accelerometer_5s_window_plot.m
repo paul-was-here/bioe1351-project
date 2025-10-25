@@ -9,8 +9,13 @@ flush(device);
 
 ts = [];
 acc = [];
+cads = [];
 starttime = datetime("now");
 fs = 100;
+pkinfo = [];
+
+% Butterworth low-pass this signal (2nd order, fc=5Hz)
+[b,a] = butter(3, 5/(fs/2));
 
 figure();
 
@@ -23,16 +28,21 @@ while true
         
 
         try
-            x_data = data(1,:)*3.3/1024-1.5;
-            y_data = data(2,:)*3.3/1024-1.5;
-            acc = [acc, (sqrt(x_data^2+y_data^2))];
+            x_read = data(1,:);
+            x_data = (x_read * 5/1024 - 3/2)/0.42;
+            y_read = data(2,:);
+            y_data = (y_read * 5/1024 -3/2) / 0.42;
+
+            acc = [acc, (sqrt(x_data^2 + y_data^2))];
+
             ts = [ts, seconds(readtime-starttime)];
 
-            plot(ts, acc, 'k-');
+            acc_filt = filtfilt(b, a, acc);
+
+            plot(ts, acc_filt, 'k-', LineWidth=1); hold on;
 
             xlim([ts(end-5*fs), ts(end)])
-            ylim([-1.5 1.5])
-
+            ylim([-1 5])
 
             drawnow limitrate;
         
@@ -43,8 +53,35 @@ while true
         if length(ts) == fs*6
             ts = ts(101:600);
             acc = acc(101:600);
-            
+            acc_filt = acc_filt(101:600);
 
+            thres = 2*std(acc_filt);
+            %[pks, pkids] = findpeaks(acc_filt, 'MinPeakProminence', thres, 'MinPeakDistance', 15);
+            [~, pkids] = findpeaks(acc_filt, 'MinPeakProminence', thres);
+
+            cadence = 60/mean(diff(ts(pkids)));
+            %fprintf("\ncadence = %f", cadence)
+
+            % The cadence formula seems kind of flawed. I averaged 3
+            % measurements which seems more accurate. I think we should do
+            % a validation study with someone counting steps/min and
+            % compare against calculated. Could also average for longer and
+            % it might be more accurate
+            % (one cadence measurement every 15/30/60s for exmaple)
+            % it also stops working at slower speeds where the peak
+            % amplitudes are really small
+
+            cads = [cads, cadence];
+            if length(cads) == 3
+                new_cad = mean(cads);
+                fprintf("\nCadence (steps/min): %.2f", new_cad);
+                cads = [];
+            end
+
+            save("data.mat","acc_filt")
+
+            cla;
+            plot(ts, acc);
         end
         %display(length(ts))
     end
