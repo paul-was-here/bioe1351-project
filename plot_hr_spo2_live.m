@@ -10,7 +10,7 @@ To-Do:
 %}
 
 % Connect to serial port:
-device = serialport("/dev/cu.usbmodem101",115200);
+device = serialport("/dev/cu.usbmodem14201",115200);
 configureTerminator(device, "LF");
 flush(device);
 
