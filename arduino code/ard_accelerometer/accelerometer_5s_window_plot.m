@@ -3,7 +3,7 @@ Author: Paul Kullmann
 BIOENG 1351/2351 Project
 %}
 
-device = serialport("/dev/cu.usbmodem101",115200);
+device = serialport("/dev/cu.usbmodem1101",115200);
 configureTerminator(device, "LF");
 flush(device);
 
@@ -13,9 +13,10 @@ cads = [];
 starttime = datetime("now");
 fs = 100;
 pkinfo = [];
+datasave = [];
 
 % Butterworth low-pass this signal (2nd order, fc=5Hz)
-[b,a] = butter(3, 5/(fs/2));
+[b,a] = butter(3, 4/(fs/2));
 
 figure();
 
@@ -34,8 +35,16 @@ while true
             y_data = (y_read * 5/1024 -3/2) / 0.42;
 
             acc = [acc, (sqrt(x_data^2 + y_data^2))];
-
             ts = [ts, seconds(readtime-starttime)];
+
+            time_save = seconds(readtime-starttime);
+            acc_save = (sqrt(x_data^2 + y_data^2));
+
+            datasave = [datasave; time_save, acc_save];
+            if size(datasave,1) >= 180*fs
+                save('Saved_Data.mat','datasave');
+            end
+
 
             acc_filt = filtfilt(b, a, acc);
 
