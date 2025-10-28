@@ -21,15 +21,18 @@ ylabel("Acc (g's)")
 
 % Velocity data:
 
-v = cumtrapz(ts, acc);
-yyaxis right;
-plot(ts, v, 'g-', LineWidth = 3)
-yyaxis left;
 
 rm = rms(acc_filt((66*fs):(93*fs)));
 fprintf("\nRMS: %.2f", rm);
-mn = mean(acc_filt((66*fs):(93*fs)));
+mn = mean(acc_filt((118*fs):(129*fs)));
 fprintf("\n Mean: %.2f", mn);
+
+v = cumtrapz(ts, (acc));
+yyaxis right;
+plot(ts, v, 'g-', LineWidth = 3)
+yline(0, 'g', LineWidth=2)
+yyaxis left;
+
 
 % Cadence algorithm:
 
@@ -47,7 +50,7 @@ for t = 501:500:length(acc_filt)
 
     % 1*std of acc data seems to catch both L+R steps while running though
 
-    plot(ts(segment_start + pkids - 1), acc_filt(segment_start + pkids - 1), 'ro'); hold on;
+    scatter(ts(segment_start + pkids - 1), acc_filt(segment_start + pkids - 1), 'ro'); hold on;
 
     fprintf("\nSteps/min for segment %.2fs to %.2fs = %.2f", ts(t-500), ts(t), cadence);
 end
