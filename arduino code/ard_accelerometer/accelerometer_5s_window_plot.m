@@ -87,7 +87,7 @@ while true
                 cads = [];
             end
 
-            save("data.mat","acc_filt")
+            save("data.mat","ts","acc")
 
             cla;
             plot(ts, acc);
