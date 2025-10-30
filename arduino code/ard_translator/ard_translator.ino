@@ -104,61 +104,96 @@ void loop()
   //Continuously taking samples from MAX30102.  Heart rate and SpO2 are calculated every 1 second
   while (1)
   {
-    //dumping the first 25 sets of samples in the memory and shift the last 75 sets of samples to the top
+    // Shift old samples
     for (byte i = 25; i < 100; i++)
     {
       redBuffer[i - 25] = redBuffer[i];
       irBuffer[i - 25] = irBuffer[i];
     }
 
-    //take 25 sets of samples before calculating the heart rate.
+    // Take 25 new samples
     for (byte i = 75; i < 100; i++)
     {
-      while (particleSensor.available() == false) //do we have new data?
-        particleSensor.check(); //Check the sensor for new data
+      while (particleSensor.available() == false)
+        particleSensor.check();
 
-      digitalWrite(readLED, !digitalRead(readLED)); //Blink onboard LED with every data read
+      digitalWrite(readLED, !digitalRead(readLED));
 
       redBuffer[i] = particleSensor.getRed();
       irBuffer[i] = particleSensor.getIR();
-      particleSensor.nextSample(); //We're finished with this sample so move to next sample
+      particleSensor.nextSample();
+    }
 
-      // Get PWM values for each function
+    // --- FIND min/max from the updated buffer ---
+    uint16_t minPPG = 65535;
+    uint16_t maxPPG = 0;
+
+    for (int j = 0; j < bufferLength; j++) {
+      if (irBuffer[j] < minPPG) minPPG = irBuffer[j];
+      if (irBuffer[j] > maxPPG) maxPPG = irBuffer[j];
+    }
+
+    float minMargin = minPPG * 0.9;
+    float maxMargin = maxPPG * 1.1;
+
+    static float smoothedMin = minMargin;
+    static float smoothedMax = maxMargin;
+    smoothedMin = 0.9 * smoothedMin + 0.1 * minMargin;
+    smoothedMax = 0.9 * smoothedMax + 0.1 * maxMargin;
+
+    // --- Map values to PWM ---
+    for (byte i = 75; i < 100; i++)
+    {
+      int pwmValue_ppg = ppgToPWM(irBuffer[i], smoothedMin, smoothedMax);
       int pwmValue_spo2 = spo2ToPWM(spo2);
-      int pwmValue_ppg = ppgToPWM(redBuffer[i]);
 
-
-      // Write the PWM vlaue to the pins
       analogWrite(outPin1, pwmValue_ppg);
       analogWrite(outPin2, pwmValue_spo2);
     }
-  
-    maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
-    // Note that the heart rate algorithm resides in a function of the included library.
+
+    // Update heart rate and SpO2
+    maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer,
+                                          &spo2, &validSPO2, &heartRate, &validHeartRate);
   }
+
 }
 
 int spo2ToPWM(float spo2){
+  //Serial.print("SpO2 value: ");
+  //Serial.print(spo2);
+  //Serial.println();
   // Discretize the spo2 value to write to the PWM pin
   if (spo2 >= 91 && spo2 <= 100){
     float digitized = spo2-90;
     int pwmValue = round((digitized/10) * 255.0);
+    //Serial.print("SpO2 PWM value: ");
+    //Serial.print(pwmValue);
+    //Serial.println();
     return pwmValue;
+
   } else { // Only choose to send 91-100 SpO2 values. Would not expect anyone to have <90, or indicates bad measurement.
+    //Serial.print("SpO2 returned 0");
+    //Serial.println();
     return (int) 0;
+
   }
 }
 
-int ppgToPWM(uint16_t ppgValue){
+int ppgToPWM(uint16_t ppgValue, uint16_t minPPG, uint16_t maxPPG){
+  //Serial.print("PPG value: ");
+  //Serial.print(ppgValue);
+  //Serial.println();
   // Map I2C PPG values to 8-bit PWM values
-  int minValue = 18000;
-  int maxValue = 25000;
 
-  if (ppgValue < minValue) {
-    ppgValue = minValue;
+  if (ppgValue < minPPG) {
+    ppgValue = minPPG;
   }
-  if (ppgValue > maxValue) {
-    ppgValue = maxValue;
+  if (ppgValue > maxPPG) {
+    ppgValue = maxPPG;
   }
-  return map(ppgValue, minValue, maxValue, 0, 255);
+  int mapped_value = map(ppgValue, minPPG, maxPPG, 0, 255); 
+  //Serial.print("Mapped value: ");
+  //Serial.print(mapped_value);
+  //Serial.println();
+  return (mapped_value);
 }
