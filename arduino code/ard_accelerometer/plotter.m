@@ -6,11 +6,16 @@ Plots saved accelerometer data.
 Test bench for our cadence algorithm.
 %}
 
-[b,a] = butter(3, 5/(fs/2));
-x = load("Leg_3min.mat");
+fs=100;
 
-ts = x.datasave(:,1);
-acc = x.datasave(:,2) - 1.38;
+[b,a] = butter(3, 10/(fs/2));
+x = load("data.mat");
+
+
+%ts = x.datasave(:,1);
+%acc = x.datasave(:,2) - 1.38;
+ts = x.ts-(x.ts(1));
+acc = x.acc - (mean(x.acc));
 acc_filt = filtfilt(b,a,acc);
 
 figure();
@@ -18,6 +23,13 @@ plot(ts,acc,'b-'); hold on;
 plot(ts,acc_filt,'k-',LineWidth=1.5);
 xlabel("Time (s)")
 ylabel("Acc (g's)")
+
+v = cumtrapz(acc_filt);
+yyaxis right
+plot(ts,v, 'r-', LineWidth=1.5);
+
+z = cumtrapz(v);
+%plot(ts,z,'g-',LineWidth=1.5)
 
 % Velocity data:
 
