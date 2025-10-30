@@ -1,8 +1,7 @@
 %{
 Author: Paul Kullmann
 BIOENG 1351/2351 Project
-Modified version of the accelerometer plotting script use with Natl
-Instruments DAQ
+Modified version of the accelerometer plotting script use with NI USB-6001
 %}
 
 %{
@@ -15,32 +14,36 @@ acc_buffer = [];
 global ts_buffer;
 ts_buffer = [];
 
-
-
 %{
 Main Function Calls
 %}
 daqSetup(fs, fc);
 
+%{
+Function Definitions
+%}
 function daqSetup(fs, fc)
-    [figDisplay, ax] = figSetup();
+    % Figure and filter Setup:
+    [~, ax] = figSetup();
     [b,a] = butter(3, fc/(fs/2), "low");
 
-    d = daq("ni");
-    addinput(d,'Dev15','ai0','Voltage'); % x-data
-    addinput(d,'Dev15','ai4','Voltage'); % y-data
-    d.Rate = fs; % 100Hz
+    % NI DAQ Setup:
+    d = daq("ni");                       % NI USB-6001 device
+    addinput(d,'Dev15','ai0','Voltage'); % accelerometer x-data
+    addinput(d,'Dev15','ai4','Voltage'); % accelerometer y-data
+    d.Rate = fs;
 
-    ard = serialport("/dev/cu.usbmodem101", 115200);
+    % Arduino Setup:
+    ard = serialport("/dev/cu.usbmodem101", 115200); % Connected USB (Arduino)
     configureTerminator(ard, "LF");
     flush(ard);
         
-    % Callback setup
+    % Callback Setup
     sec_to_plot = 3;
     d.ScansAvailableFcnCount = fs/10;
     d.ScansAvailableFcn = @(src, evt) plotFcn(src, evt, ax, fs, b, a, ard, sec_to_plot);
     
-    % Start acquisition
+    % Start Acquisition
     start(d, 'continuous');
 
     % Hold until button press
@@ -52,9 +55,12 @@ function daqSetup(fs, fc)
 end
 
 function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
+    % Callback function for plotting when available
+
     global acc_buffer;
     global ts_buffer;
 
+    % Obtain data:
     [data, ts, ~] = read(src, src.ScansAvailableFcnCount, OutputFormat='Matrix');
     if ard.NumBytesAvailable > 0
         line = readline(ard);
@@ -73,7 +79,7 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
         spo2 = ard_data(1);
         fprintf("SpO2 value: %.2f", spo2);
         ppg_buffer = ard_data(2:end);
-        % call 
+        % heartrate detection fcn call
         hr = getHeartrate(ppg_buffer);
         fprintf("Heart rate: %.2f", hr)
 
@@ -102,10 +108,12 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
         end
 
         debug_i = debug_i + 1;
-        %fprintf("\nError geting or plotting data %f", debug_i)
+        fprintf("\nError geting or plotting data. Try: %f", debug_i)
     end
 
     if length(ts_buffer) >= fs*(sec_to_plot+1)
+        % Clear plot and shift buffer one second over
+
         ts_buffer = ts_buffer((fs+1):((sec_to_plot+1)*fs));
         acc_buffer = acc_buffer((fs+1):((sec_to_plot+1)*fs));
         
@@ -120,9 +128,10 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
 
 end
 
-function [disp, ax] = figSetup()
-    
-    disp = figure();
+function [fig, ax] = figSetup()
+    % Create figure and axes objects
+
+    fig = figure();
     ax = gca;
     title(ax, "Accelerometer Data Acquisition")
     xlabel(ax, "Time (s)")
