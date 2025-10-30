@@ -8,12 +8,14 @@ Instruments DAQ
 %{
 Global Variables
 %}
-fs = 100;           % Sampling rate
+fs = 300;           % Sampling rate
 fc = 5;             % Cutoff frequency for butterworth filter
 global acc_buffer;  % Preallocate empty buffer arrays
 acc_buffer = [];
 global ts_buffer;
 ts_buffer = [];
+
+
 
 %{
 Main Function Calls
@@ -22,16 +24,21 @@ daqSetup(fs, fc);
 
 function daqSetup(fs, fc)
     [figDisplay, ax] = figSetup();
-    filt = butter(3, fc/(fs/2));
+    [b,a] = butter(3, fc/(fs/2), "low");
 
     d = daq("ni");
-    addinput(d,'dev1','ai0','Voltage'); % x-data
-    addinput(d,'dev1','ai1','Voltage'); % y-data
+    addinput(d,'Dev15','ai0','Voltage'); % x-data
+    addinput(d,'Dev15','ai4','Voltage'); % y-data
     d.Rate = fs; % 100Hz
 
+    ard = serialport("/dev/cu.usbmodem101", 115200);
+    configureTerminator(ard, "LF");
+    flush(ard);
+        
     % Callback setup
-    d.ScansAvailableFcnCount = fs/10; % every 1/4s update
-    d.ScansAvailableFcn = @(src, evt) plotFcn(src, evt, ax, fs, filt);
+    sec_to_plot = 3;
+    d.ScansAvailableFcnCount = fs/10;
+    d.ScansAvailableFcn = @(src, evt) plotFcn(src, evt, ax, fs, b, a, ard, sec_to_plot);
     
     % Start acquisition
     start(d, 'continuous');
@@ -44,37 +51,70 @@ function daqSetup(fs, fc)
     flush(d)
 end
 
-function plotFcn(src, ~, ax, fs, filt)
+function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
     global acc_buffer;
     global ts_buffer;
 
     [data, ts, ~] = read(src, src.ScansAvailableFcnCount, OutputFormat='Matrix');
-    try
-        x_data = (data(:,1).*5./1024 - 3/2) ./ 0.42;
-        y_data = (data(:,2).*5./1024 - 3/2) ./ 0.42;
-        acc = sqrt(x_data.^2 + y_data.^2); 
-
-        acc_filt = filtfilt(filt(1), filt(2), acc);
-
-        acc_buffer = [acc_buffer, acc_filt];
-        ts_buffer = [ts_buffer, ts];
-
-        plot(ts, acc_filt, 'k-', LineWidth = 1); hold on;
-
-        xlim([ts_buffer(end-5*fs), ts_buffer(end)]);
-        ylim([-1 5]);
-    catch
-        dispaly("Erorr geting or plotting data")
+    if ard.NumBytesAvailable > 0
+        line = readline(ard);
     end
 
-    if length(ts_buffer) >= fs*6
-        ts_buffer = ts_buffer((fs+1):(6*fs));
-        acc_buffer = acc_buffer((fs+1):(6*fs));
-        
-        cadenceAlgorithm(); % function call for cadence 
+    try
+        % Data preparation:
+        x_data = (data(:,1) - 3/2) ./ 0.42;
+        y_data = (data(:,2) - 3/2) ./ 0.42;
+        acc = sqrt(x_data.^2 + y_data.^2); 
 
-        cla;
-        plot(ts_buffer, acc_buffer, 'b-');
+        ard_data = str2double(split(line, ','));
+        ard_readtime = ts(1);
+        % Receive ard data in the format: 
+        % [spo2_value, PPG_buffer]
+        spo2 = ard_data(1);
+        fprintf("SpO2 value: %.2f", spo2);
+        ppg_buffer = ard_data(2:end);
+        % call 
+        hr = getHeartrate(ppg_buffer);
+        fprintf("Heart rate: %.2f", hr)
+
+        persistent z;
+        if isempty(z)
+            z = [];
+        end
+        [acc_filt,z] = filter(b,a,acc,z);
+
+        acc_buffer = [acc_buffer; acc_filt];
+        ts_buffer  = [ts_buffer; ts];
+
+
+
+        % Plotting:
+
+        plot(ax, ts, acc_filt, 'k-', LineWidth = 1.5); hold(ax, 'on');
+
+        xlim([ts_buffer(end-sec_to_plot*fs), ts_buffer(end)]);
+        ylim("tight");
+        drawnow limitrate;
+    catch
+        persistent debug_i;
+        if isempty(debug_i)
+            debug_i = 0;
+        end
+
+        debug_i = debug_i + 1;
+        %fprintf("\nError geting or plotting data %f", debug_i)
+    end
+
+    if length(ts_buffer) >= fs*(sec_to_plot+1)
+        ts_buffer = ts_buffer((fs+1):((sec_to_plot+1)*fs));
+        acc_buffer = acc_buffer((fs+1):((sec_to_plot+1)*fs));
+        
+        %getCadence(); % function call for cadence algo with the 5s
+        %of data
+
+        cla(ax);
+        %fprintf("Cleared ax")
+        plot(ax, ts_buffer, acc_buffer, 'b-');
 
     end
 
@@ -90,88 +130,45 @@ function [disp, ax] = figSetup()
     hold(ax, 'on');
 end
 
-device = serialport("/dev/cu.usbmodem101",115200);
-configureTerminator(device, "LF");
-flush(device);
+function cadence = getCadence(ts, acc)
+    % Calculate cadence in steps per minute
 
-ts = [];
-acc = [];
-cads = [];
-starttime = datetime("now");
-fs = 100;
-pkinfo = [];
+    thres_multiplier = 1;
 
-% Butterworth low-pass this signal (2nd order, fc=5Hz)
-[b,a] = butter(3, 5/(fs/2));
+    thres = thres_multiplier * std(acc);
+    [pks, pkids] = findpeaks(acc, 'MinPeakProminence', thres);
+    cadence = 60/mean(diff(ts(pkids)));
+end
 
-figure();
+function hr = getHeartrate(ppg)
+    % Calculate the heart rate in beats per minute
+    % need to extrapolate a ts 
 
-while true
-    if device.NumBytesAvailable > 0
-        line = readline(device);
-        data = str2double(split(line, ','));
-        readtime = datetime("now");
+    % Local vars:
+    thres_multiplier = 1;   % Threshold multiplier
+    fs = 400;               % Arduino sample rate
 
-        
+    % Each ppg buffer should be fs samples long?
 
-        try
-            x_read = data(1,:);
-            x_data = (x_read * 5/1024 - 3/2)/0.42;
-            y_read = data(2,:);
-            y_data = (y_read * 5/1024 -3/2) / 0.42;
+    % Use the mean of the first and last 25s to establish a linear gradient
+    % Use this gradient to eliminate low-frequency drift
+    start_avg = mean(ppg(1:25));
+    end_avg = mean(ppg((end-25:end)));
 
-            acc = [acc, (sqrt(x_data^2 + y_data^2))];
+    ts = (0:length(ppg)-1) / fs;
 
-            ts = [ts, seconds(readtime-starttime)];
-
-            acc_filt = filtfilt(b, a, acc);
-
-            plot(ts, acc_filt, 'k-', LineWidth=1); hold on;
-
-            xlim([ts(end-5*fs), ts(end)])
-            ylim([-1 5])
-
-            drawnow limitrate;
-        
-        catch
-            display('error getting data');
-        end
-
-        if length(ts) == fs*6
-            ts = ts(101:600);
-            acc = acc(101:600);
-            acc_filt = acc_filt(101:600);
-
-            thres = 2*std(acc_filt);
-            %[pks, pkids] = findpeaks(acc_filt, 'MinPeakProminence', thres, 'MinPeakDistance', 15);
-            [~, pkids] = findpeaks(acc_filt, 'MinPeakProminence', thres);
-
-            cadence = 60/mean(diff(ts(pkids)));
-            %fprintf("\ncadence = %f", cadence)
-
-            % The cadence formula seems kind of flawed. I averaged 3
-            % measurements which seems more accurate. I think we should do
-            % a validation study with someone counting steps/min and
-            % compare against calculated. Could also average for longer and
-            % it might be more accurate
-            % (one cadence measurement every 15/30/60s for exmaple)
-            % it also stops working at slower speeds where the peak
-            % amplitudes are really small
-
-            cads = [cads, cadence];
-            if length(cads) == 3
-                new_cad = mean(cads);
-                fprintf("\nCadence (steps/min): %.2f", new_cad);
-                cads = [];
-            end
-
-            save("data.mat","acc_filt")
-
-            cla;
-            plot(ts, acc);
-        end
-        %display(length(ts))
+    drift_slope = (end_avg - start_avg) / ts(end);
+    
+    for i = 1:length(ppg)
+        ppg(i) = ppg(i) + ts(i)*drift_slope;
     end
+
+    % lowpass filter? could that just do the job of the "drift correction"
+
+    % Peak detection:
+    thres = thres_multiplier * std(ppg);
+    [pks, pkids] = findpeaks(ppg, 'MinPeakDistance', ppg);
+    hr = 60/mean(diff(ts(pkids)));
 end
 
 
