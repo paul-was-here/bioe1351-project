@@ -38,7 +38,7 @@ byte readLED = 13; //Blinks with each data read
 
 void setup()
 {
-  Serial.begin(115200); // initialize serial communication at 115200 bits per second:
+  Serial.begin(230400); // initialize serial communication at 115200 bits per second:
 
   pinMode(pulseLED, OUTPUT);
   pinMode(readLED, OUTPUT);
@@ -55,7 +55,7 @@ void setup()
   byte ledBrightness = 60; //Options: 0=Off to 255=50mA
   byte sampleAverage = 4; //Options: 1, 2, 4, 8, 16, 32
   byte ledMode = 2; //Options: 1 = Red only, 2 = Red + IR, 3 = Red + IR + Green
-  byte sampleRate = 400; //Options: 50, 100, 200, 400, 800, 1000, 1600, 3200
+  byte sampleRate = 100; //Options: 50, 100, 200, 400, 800, 1000, 1600, 3200
   int pulseWidth = 411; //Options: 69, 118, 215, 411
   int adcRange = 4096; //Options: 2048, 4096, 8192, 16384
 
@@ -128,6 +128,7 @@ void loop()
       Serial.println(validSPO2, DEC);
       */
 
+      /*
       // Print red,ir,spo2 in format for reading to MATLAB
       Serial.print(redBuffer[i]);
       Serial.print(",");
@@ -135,8 +136,8 @@ void loop()
       Serial.print(",");
       Serial.print(spo2);
       Serial.println();
-
-
+      */
+    
 
     }
     
@@ -146,6 +147,16 @@ void loop()
     The SpO2 algorithm seems acceptable when validated against an Apple Watch.
     Although the algorithm in this script is still computing heart rate, we choose not to use it and instead send the PPG information to Matlab for online peak detection and processing.
     */
+
+    // Print entire buffer
+    int len = sizeof(redBuffer) / sizeof(redBuffer[0]);
+    for (int i = 0; i < len; i++){
+      Serial.print(redBuffer[i]);
+      Serial.print(",");
+    }
+    Serial.print(spo2);
+    Serial.println();
+
 
     maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
     // Note that the heart rate algorithm resides in a function of the included library.
