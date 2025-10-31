@@ -14,6 +14,14 @@ acc_buffer = [];
 global ts_buffer;
 ts_buffer = [];
 
+global ard_ts_buffer;
+ard_ts_buffer = [];
+global ard_ppg_buffer;
+ard_ppg_buffer = [];
+
+global starttime;
+starttime = datetime("now");
+
 %{
 Main Function Calls
 %}
@@ -29,12 +37,12 @@ function daqSetup(fs, fc)
 
     % NI DAQ Setup:
     d = daq("ni");                       % NI USB-6001 device
-    addinput(d,'Dev15','ai0','Voltage'); % accelerometer x-data
-    addinput(d,'Dev15','ai4','Voltage'); % accelerometer y-data
+    addinput(d,'Dev1','ai0','Voltage'); % accelerometer x-data
+    addinput(d,'Dev1','ai4','Voltage'); % accelerometer y-data
     d.Rate = fs;
 
     % Arduino Setup:
-    ard = serialport("/dev/cu.usbmodem101", 115200); % Connected USB (Arduino)
+    ard = serialport("COM3", 230400); % Connected USB (Arduino)
     configureTerminator(ard, "LF");
     flush(ard);
         
@@ -59,11 +67,45 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
 
     global acc_buffer;
     global ts_buffer;
+    global starttime;
+    global ard_ppg_buffer;
+    global ard_ts_buffer;
 
     % Obtain data:
     [data, ts, ~] = read(src, src.ScansAvailableFcnCount, OutputFormat='Matrix');
     if ard.NumBytesAvailable > 0
         line = readline(ard);
+        disp("raw line: ")
+        disp(line)
+        try
+            ard_data = str2double(split(line, ','));
+            ard_readtime = seconds(datetime("now") - starttime);
+            % Receive ard data in the format: 
+            % [spo2_value, PPG_buffer]
+            spo2 = ard_data(end);
+            fprintf("\nSpO2 value: %.2f", spo2);
+            ppg_buffer = ard_data(1:(end-1));
+            %fprintf("\n PPG buffer: %.2f", ppg_buffer)
+            % heartrate detection fcn call
+            %hr = getHeartrate(ppg_buffer);
+            %fprintf("Heart rate: %.2f", hr)
+
+            ard_fs = 100;
+            ts_end = ard_readtime + (length(ppg_buffer) - 1)/ard_fs;
+
+            ts_ard = linspace(ard_readtime, ts_end, length(ppg_buffer));
+
+            ard_ts_buffer = [ard_ts_buffer, ts_ard];
+            ard_ppg_buffer = [ard_ppg_buffer, ppg_buffer];
+
+            yyaxis right;
+            plot(ax, ts_ard, ppg_buffer, 'r-'); hold on;
+            ylim(ax, "tight");
+
+        catch ME
+            fprintf("\n Error in arduino");
+            fprintf("\nMessage: %s", ME.message);
+        end
     end
 
     try
@@ -72,16 +114,7 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
         y_data = (data(:,2) - 3/2) ./ 0.42;
         acc = sqrt(x_data.^2 + y_data.^2); 
 
-        ard_data = str2double(split(line, ','));
-        ard_readtime = ts(1);
-        % Receive ard data in the format: 
-        % [spo2_value, PPG_buffer]
-        spo2 = ard_data(1);
-        fprintf("SpO2 value: %.2f", spo2);
-        ppg_buffer = ard_data(2:end);
-        % heartrate detection fcn call
-        hr = getHeartrate(ppg_buffer);
-        fprintf("Heart rate: %.2f", hr)
+        
 
         persistent z;
         if isempty(z)
@@ -95,7 +128,7 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
 
 
         % Plotting:
-
+        yyaxis left;
         plot(ax, ts, acc_filt, 'k-', LineWidth = 1.5); hold(ax, 'on');
 
         xlim([ts_buffer(end-sec_to_plot*fs), ts_buffer(end)]);
@@ -122,7 +155,10 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
 
         cla(ax);
         %fprintf("Cleared ax")
+        yyaxis left;
         plot(ax, ts_buffer, acc_buffer, 'b-');
+        yyaxis right;
+        plot(ax, ard_ts_buffer, ard_ppg_buffer, 'r-');
 
     end
 
