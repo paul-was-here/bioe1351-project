@@ -19,6 +19,10 @@ ard_ts_buffer = [];
 global ard_ppg_buffer;
 ard_ppg_buffer = [];
 
+global ppg_datasave;
+ppg_datasave = [];
+
+
 global starttime;
 starttime = datetime("now");
 
@@ -31,18 +35,20 @@ daqSetup(fs, fc);
 Function Definitions
 %}
 function daqSetup(fs, fc)
+    global ppg_datasave;
+
     % Figure and filter Setup:
     [~, ax] = figSetup();                   % Get ax objects
     [b,a] = butter(3, fc/(fs/2), "low");    % Create filter coeffs
 
     % NI DAQ Setup:
     d = daq("ni");                          % NI USB-6001 device
-    addinput(d,'Dev1','ai0','Voltage');     % ->Accelerometer x-data
-    addinput(d,'Dev1','ai4','Voltage');     % ->Accelerometer y-data
+    addinput(d,'Dev15','ai0','Voltage');     % ->Accelerometer x-data
+    addinput(d,'Dev15','ai4','Voltage');     % ->Accelerometer y-data
     d.Rate = fs;                            % Set sampling rate
 
     % Arduino Setup:
-    ard = serialport("COM3", 230400);       % Connected USB (Arduino)
+    ard = serialport("COM4", 230400);       % Connected USB (Arduino)
     configureTerminator(ard, "LF");
     flush(ard);
         
@@ -60,6 +66,7 @@ function daqSetup(fs, fc)
     % DAQ Cleanup
     stop(d)
     flush(d)
+    save("saved_ppg_data.mat","ppg_datasave")
 end
 
 function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
@@ -70,6 +77,8 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
     global starttime;
     global ard_ppg_buffer;
     global ard_ts_buffer;
+
+    global ppg_datasave;
 
     %% NI DAQ Data Acquisition:
     [data, ts, ~] = read(src, src.ScansAvailableFcnCount, OutputFormat='Matrix');
@@ -124,10 +133,10 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
 
             ppg_buffer = ard_data(1:(end-1));
 
-            ard_fs = 25;       % Ard sampling rate 
-            % *** Must be adjusted for sampling average to assign accurate
-            % timestamps in Matlab
-            % Ard code: byte sampleRate / byte sampleAverage (100/4 e.g.)
+            % Local Arduino settings:
+            ard_sample_rate = 25;           % Sampling rate 
+            ard_samples_per_value = 4;      % # samples averaged per value
+            ard_fs = ard_sample_rate/ard_samples_per_value;
 
             %ts_end = ard_readtime + (length(ppg_buffer) - 1)/ard_fs;
             ts_start = ard_readtime - (length(ppg_buffer) - 1)/ard_fs;
@@ -138,6 +147,9 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
 
             ard_ts_buffer = [ard_ts_buffer, ts_ard];
             ard_ppg_buffer = [ard_ppg_buffer, ppg_buffer];
+
+            ppg_datasave = [ppg_datasave; [ts_ard(:) ppg_buffer(:)]];
+
 
             yyaxis right;
             plot(ax, ts_ard, ppg_buffer, 'r-'); hold on;
@@ -161,6 +173,8 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
 
         % Shift arduino data 75 over: (this probably won't work since the
         % timing isn't consistent btw the two)
+        % could have an block that looks for the earliest time of the new plot and clears
+        % anything before that ? would this add excessive runtime?
         ard_ts_buffer = ard_ts_buffer(75:end);
         ard_ppg_buffer = ard_ppg_buffer(75:end);
         
