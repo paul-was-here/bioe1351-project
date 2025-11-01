@@ -32,29 +32,29 @@ Function Definitions
 %}
 function daqSetup(fs, fc)
     % Figure and filter Setup:
-    [~, ax] = figSetup();
-    [b,a] = butter(3, fc/(fs/2), "low");
+    [~, ax] = figSetup();                   % Get ax objects
+    [b,a] = butter(3, fc/(fs/2), "low");    % Create filter coeffs
 
     % NI DAQ Setup:
-    d = daq("ni");                       % NI USB-6001 device
-    addinput(d,'Dev1','ai0','Voltage'); % accelerometer x-data
-    addinput(d,'Dev1','ai4','Voltage'); % accelerometer y-data
-    d.Rate = fs;
+    d = daq("ni");                          % NI USB-6001 device
+    addinput(d,'Dev1','ai0','Voltage');     % ->Accelerometer x-data
+    addinput(d,'Dev1','ai4','Voltage');     % ->Accelerometer y-data
+    d.Rate = fs;                            % Set sampling rate
 
     % Arduino Setup:
-    ard = serialport("COM3", 230400); % Connected USB (Arduino)
+    ard = serialport("COM3", 230400);       % Connected USB (Arduino)
     configureTerminator(ard, "LF");
     flush(ard);
         
     % Callback Setup
-    sec_to_plot = 3;
-    d.ScansAvailableFcnCount = fs/10;
+    sec_to_plot = 3;                        % Seconds to plot
+    d.ScansAvailableFcnCount = fs/10;       % Effective plot refresh rate 
     d.ScansAvailableFcn = @(src, evt) plotFcn(src, evt, ax, fs, b, a, ard, sec_to_plot);
     
     % Start Acquisition
     start(d, 'continuous');
 
-    % Hold until button press
+    % Run until button press
     waitforbuttonpress();
 
     % DAQ Cleanup
@@ -71,70 +71,33 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
     global ard_ppg_buffer;
     global ard_ts_buffer;
 
-    % Obtain data:
+    %% NI DAQ Data Acquisition:
     [data, ts, ~] = read(src, src.ScansAvailableFcnCount, OutputFormat='Matrix');
-    if ard.NumBytesAvailable > 0
-        line = readline(ard);
-        disp("raw line: ")
-        disp(line)
-        try
-            ard_data = str2double(split(line, ','));
-            ard_readtime = seconds(datetime("now") - starttime);
-            % Receive ard data in the format: 
-            % [spo2_value, PPG_buffer]
-            spo2 = ard_data(end);
-            fprintf("\nSpO2 value: %.2f", spo2);
-            ppg_buffer = ard_data(1:(end-1));
-            %fprintf("\n PPG buffer: %.2f", ppg_buffer)
-            % heartrate detection fcn call
-            %hr = getHeartrate(ppg_buffer);
-            %fprintf("Heart rate: %.2f", hr)
-
-            ard_fs = 100;
-            ts_end = ard_readtime + (length(ppg_buffer) - 1)/ard_fs;
-
-            ts_ard = linspace(ard_readtime, ts_end, length(ppg_buffer));
-
-            ard_ts_buffer = [ard_ts_buffer, ts_ard];
-            ard_ppg_buffer = [ard_ppg_buffer, ppg_buffer];
-
-            yyaxis right;
-            plot(ax, ts_ard, ppg_buffer, 'r-'); hold on;
-            ylim(ax, "tight");
-
-        catch ME
-            fprintf("\n Error in arduino");
-            fprintf("\nMessage: %s", ME.message);
-        end
-    end
-
     try
         % Data preparation:
         x_data = (data(:,1) - 3/2) ./ 0.42;
         y_data = (data(:,2) - 3/2) ./ 0.42;
         acc = sqrt(x_data.^2 + y_data.^2); 
 
-        
-
-        persistent z;
+        % Filtering:
+        persistent z;   % Persistent filter history variable (smooths data)
         if isempty(z)
             z = [];
         end
         [acc_filt,z] = filter(b,a,acc,z);
 
+        % Save to plotting buffer:
         acc_buffer = [acc_buffer; acc_filt];
         ts_buffer  = [ts_buffer; ts];
-
-
 
         % Plotting:
         yyaxis left;
         plot(ax, ts, acc_filt, 'k-', LineWidth = 1.5); hold(ax, 'on');
-
         xlim([ts_buffer(end-sec_to_plot*fs), ts_buffer(end)]);
         ylim("tight");
         drawnow limitrate;
     catch
+        % Debug catch
         persistent debug_i;
         if isempty(debug_i)
             debug_i = 0;
@@ -144,24 +107,65 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
         fprintf("\nError geting or plotting data. Try: %f", debug_i)
     end
 
+    %% Arduino Data Acquisition:
+    if ard.NumBytesAvailable > 0
+        line = readline(ard);
+        disp("raw line: ")  % Debug
+        disp(line)          % Debug
+        try
+            ard_data = str2double(split(line, ','));
+            ard_readtime = seconds(datetime("now") - starttime);
+
+            % Receive ard data in the format: 
+            % [ppg_buffer (array), spo2 (float)]
+
+            spo2 = ard_data(end);
+            fprintf("\nSpO2 value: %.2f", spo2);
+
+            ppg_buffer = ard_data(1:(end-1));
+
+            ard_fs = 100;
+            %ts_end = ard_readtime + (length(ppg_buffer) - 1)/ard_fs;
+            ts_start = ard_readtime - (length(ppg_buffer) - 1)/ard_fs;
+
+            ts_ard = linspace(ts_start, ard_readtime, length(ppg_buffer));
+            % Since we are retroactively receiving data from the past ~1s,
+            % assign ard_readtime as the timestamp for the LAST value
+
+            ard_ts_buffer = [ard_ts_buffer, ts_ard];
+            ard_ppg_buffer = [ard_ppg_buffer, ppg_buffer];
+
+            yyaxis right;
+            plot(ax, ts_ard, ppg_buffer, 'r-'); hold on;
+            ylim(ax, "tight");
+            drawnow limitrate;
+        catch ME
+            fprintf("\n Error in arduino data acquisition");
+            fprintf("\nMessage: %s", ME.message);
+        end
+    else
+        fprintf("\n No line of Ard data available."); % Debug print
+    end
+
+    %% Plot Buffer Clearing:
     if length(ts_buffer) >= fs*(sec_to_plot+1)
         % Clear plot and shift buffer one second over
 
+        % Shift accelerometer buffer 1s over:
         ts_buffer = ts_buffer((fs+1):((sec_to_plot+1)*fs));
         acc_buffer = acc_buffer((fs+1):((sec_to_plot+1)*fs));
-        
-        %getCadence(); % function call for cadence algo with the 5s
-        %of data
 
+        % Shift arduino data 75 over: (this probably won't work since the
+        % timing isn't consistent btw the two)
+        ard_ts_buffer = ard_ts_buffer(75:end);
+        ard_ppg_buffer = ard_ppg_buffer(75:end);
+        
         cla(ax);
-        %fprintf("Cleared ax")
         yyaxis left;
         plot(ax, ts_buffer, acc_buffer, 'b-');
         yyaxis right;
         plot(ax, ard_ts_buffer, ard_ppg_buffer, 'r-');
-
     end
-
 end
 
 function [fig, ax] = figSetup()
@@ -175,6 +179,8 @@ function [fig, ax] = figSetup()
     hold(ax, 'on');
 end
 
+
+%% WIP functions
 function cadence = getCadence(ts, acc)
     % Calculate cadence in steps per minute
 
