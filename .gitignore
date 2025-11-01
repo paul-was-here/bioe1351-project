@@ -5,3 +5,4 @@ arduino code/ard_accelerometer/Test_1.mat
 arduino code/ard_accelerometer/Wrist_5min.mat
 arduino code/.DS_Store
 arduino code/ard_accelerometer/.DS_Store
+nidaq code/nidaq_accelerometer/saved_ppg_data.mat
