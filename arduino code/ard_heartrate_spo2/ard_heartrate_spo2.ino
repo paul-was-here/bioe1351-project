@@ -67,8 +67,7 @@ void loop()
   bufferLength = 100; //buffer length of 100 stores 4 seconds of samples running at 25sps
 
   //read the first 100 samples, and determine the signal range
-  for (byte i = 0 ; i < bufferLength ; i++)
-  {
+  for (byte i = 0 ; i < bufferLength ; i++) {
     while (particleSensor.available() == false) //do we have new data?
       particleSensor.check(); //Check the sensor for new data
 
@@ -88,18 +87,15 @@ void loop()
   maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
 
   //Continuously taking samples from MAX30102.  Heart rate and SpO2 are calculated every 1 second
-  while (1)
-  {
+  while (1) {
     //dumping the first 25 sets of samples in the memory and shift the last 75 sets of samples to the top
-    for (byte i = 25; i < 100; i++)
-    {
+    for (byte i = 25; i < 100; i++) {
       redBuffer[i - 25] = redBuffer[i];
       irBuffer[i - 25] = irBuffer[i];
     }
 
     //take 25 sets of samples before calculating the heart rate.
-    for (byte i = 75; i < 100; i++)
-    {
+    for (byte i = 75; i < 100; i++) {
       while (particleSensor.available() == false) //do we have new data?
         particleSensor.check(); //Check the sensor for new data
 
@@ -108,55 +104,16 @@ void loop()
       redBuffer[i] = particleSensor.getRed();
       irBuffer[i] = particleSensor.getIR();
       particleSensor.nextSample(); //We're finished with this sample so move to next sample
-
-      /* no need to print this...
-      Serial.print(F("red="));
-      Serial.print(redBuffer[i], DEC);
-      Serial.print(F(", ir="));
-      Serial.print(irBuffer[i], DEC);
-
-      Serial.print(F(", HR="));
-      Serial.print(heartRate, DEC);
-
-      Serial.print(F(", HRvalid="));
-      Serial.print(validHeartRate, DEC);
-
-      Serial.print(F(", SPO2="));
-      Serial.print(spo2, DEC);
-
-      Serial.print(F(", SPO2Valid="));
-      Serial.println(validSPO2, DEC);
-      */
-
-      /*
-      // Print red,ir,spo2 in format for reading to MATLAB
-      Serial.print(redBuffer[i]);
-      Serial.print(",");
-      Serial.print(irBuffer[i]);
-      Serial.print(",");
-      Serial.print(spo2);
-      Serial.println();
-      */
-    
-
     }
-    
-    /*
-    Paul's Note:
-    We find the heart rate algorithm included in the MAX30105 library to be inaccurate and unreliable.
-    The SpO2 algorithm seems acceptable when validated against an Apple Watch.
-    Although the algorithm in this script is still computing heart rate, we choose not to use it and instead send the PPG information to Matlab for online peak detection and processing.
-    */
 
-    // Print entire buffer
+    // Print entire buffer in the format [PPG_Buffer (array), spo2 (int)]
     int len = sizeof(redBuffer) / sizeof(redBuffer[0]);
-    for (int i = 0; i < len; i++){
+    for (int i = 0; i < len; i++) {
       Serial.print(redBuffer[i]);
       Serial.print(",");
     }
     Serial.print(spo2);
     Serial.println();
-
 
     maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
     // Note that the heart rate algorithm resides in a function of the included library.
