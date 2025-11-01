@@ -124,7 +124,11 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
 
             ppg_buffer = ard_data(1:(end-1));
 
-            ard_fs = 100;
+            ard_fs = 25;       % Ard sampling rate 
+            % *** Must be adjusted for sampling average to assign accurate
+            % timestamps in Matlab
+            % Ard code: byte sampleRate / byte sampleAverage (100/4 e.g.)
+
             %ts_end = ard_readtime + (length(ppg_buffer) - 1)/ard_fs;
             ts_start = ard_readtime - (length(ppg_buffer) - 1)/ard_fs;
 
