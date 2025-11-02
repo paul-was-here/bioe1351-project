@@ -53,7 +53,7 @@ function daqSetup(fs, fc)
     flush(ard);
         
     % Callback Setup
-    sec_to_plot = 3;                        % Seconds to plot
+    sec_to_plot = 8;                        % Seconds to plot
     d.ScansAvailableFcnCount = fs/10;       % Effective plot refresh rate 
     d.ScansAvailableFcn = @(src, evt) plotFcn(src, evt, ax, fs, b, a, ard, sec_to_plot);
     
@@ -119,8 +119,8 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
     %% Arduino Data Acquisition:
     if ard.NumBytesAvailable > 0
         line = readline(ard);
-        disp("raw line: ")  % Debug
-        disp(line)          % Debug
+        %disp("raw line: ")  % Debug
+        %disp(line)          % Debug
         try
             ard_data = str2double(split(line, ','));
             ard_readtime = seconds(datetime("now") - starttime);
@@ -134,8 +134,10 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
             ppg_buffer = ard_data(1:(end-1));
 
             % Local Arduino settings:
-            ard_sample_rate = 25;           % Sampling rate 
-            ard_samples_per_value = 4;      % # samples averaged per value
+            ard_sample_rate = 100;               % Sampling rate 
+            ard_samples_per_value = 10;          % # samples averaged per value
+            % something abt this is weird cause the arduino is set to avg 4
+            % samples value so idk lol. with 10 the timing is accurate
             ard_fs = ard_sample_rate/ard_samples_per_value;
 
             %ts_end = ard_readtime + (length(ppg_buffer) - 1)/ard_fs;
@@ -149,7 +151,19 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
             ard_ppg_buffer = [ard_ppg_buffer, ppg_buffer];
 
             ppg_datasave = [ppg_datasave; [ts_ard(:) ppg_buffer(:)]];
+            
+            % Create a valid timestamp string for the filename
+            fname = datestr(now, 'yyyymmdd_HHMMSS');  % e.g. '20251102_154530'
+            
+            % Build the full filename
+            fname = [fname '.mat'];
+            
+            % Save variables
+            %save(fname, 'ts_ard', 'ppg_buffer');
 
+
+            hr = getHeartrate(ts_ard, ppg_buffer);
+            fprintf("\nHeart rate: %.2f", hr)
 
             yyaxis right;
             plot(ax, ts_ard, ppg_buffer, 'r-'); hold on;
@@ -160,7 +174,7 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
             fprintf("\nMessage: %s", ME.message);
         end
     else
-        fprintf("\n No line of Ard data available."); % Debug print
+        %fprintf("\n No line of Ard data available."); % Debug print
     end
 
     %% Plot Buffer Clearing:
@@ -191,7 +205,7 @@ function [fig, ax] = figSetup()
 
     fig = figure();
     ax = gca;
-    title(ax, "Accelerometer Data Acquisition")
+    title(ax, "Data Acquisition")
     xlabel(ax, "Time (s)")
     ylabel(ax, "Acceleration (g's)")
     hold(ax, 'on');
@@ -209,34 +223,20 @@ function cadence = getCadence(ts, acc)
     cadence = 60/mean(diff(ts(pkids)));
 end
 
-function hr = getHeartrate(ppg)
+function hr = getHeartrate(ts, ppg)
     % Calculate the heart rate in beats per minute
-    % need to extrapolate a ts 
-
     % Local vars:
     thres_multiplier = 1;   % Threshold multiplier
-    fs = 400;               % Arduino sample rate
 
-    % Each ppg buffer should be fs samples long?
+    [b,a] = butter(3, 0.7/10/2, "high");
 
-    % Use the mean of the first and last 25s to establish a linear gradient
-    % Use this gradient to eliminate low-frequency drift
-    start_avg = mean(ppg(1:25));
-    end_avg = mean(ppg((end-25:end)));
-
-    ts = (0:length(ppg)-1) / fs;
-
-    drift_slope = (end_avg - start_avg) / ts(end);
-    
-    for i = 1:length(ppg)
-        ppg(i) = ppg(i) + ts(i)*drift_slope;
-    end
+    filt = filtfilt(b,a,ppg);
 
     % lowpass filter? could that just do the job of the "drift correction"
 
     % Peak detection:
-    thres = thres_multiplier * std(ppg);
-    [pks, pkids] = findpeaks(ppg, 'MinPeakDistance', ppg);
+    thres = thres_multiplier * std(filt);
+    [pks, pkids] = findpeaks(filt, 'MinPeakProminence', thres);
     hr = 60/mean(diff(ts(pkids)));
 end
 
