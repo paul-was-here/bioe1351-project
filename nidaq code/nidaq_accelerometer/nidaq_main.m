@@ -8,7 +8,7 @@ Modified version of the accelerometer plotting script use with NI USB-6001
 Global Variables
 %}
 fs = 300;           % Sampling rate
-fc = 5;             % Cutoff frequency for butterworth filter
+fc = 10;             % Cutoff frequency for butterworth filter
 global acc_buffer;  % Preallocate empty buffer arrays
 acc_buffer = [];
 global ts_buffer;
@@ -165,7 +165,7 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
 
             %hr = getHeartrate(ts_ard, ppg_buffer);
             %fprintf("\nHeart rate: %.2f", hr)
-            fprintf('Length ts_ard: %d, Length ppg_buffer: %d\n', length(ts_ard), length(ppg_buffer));
+            %fprintf('Length ts_ard: %d, Length ppg_buffer: %d\n', length(ts_ard), length(ppg_buffer));
 
             yyaxis right;
             cla(ax);
@@ -199,7 +199,9 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
 
     %% Plot Buffer Clearing:
     if length(ts_buffer) >= fs*(sec_to_plot+1)
-        % Clear plot and shift buffer one second over
+        % Use currently plotted data to compute cadence before clearing
+        cadence = cadenceFcn(ts_buffer, acc_buffer);
+        fprintf("\nComputed cadence: %.2f steps/min", cadence)
 
         % Shift accelerometer buffer 1s over:
         ts_buffer = ts_buffer((fs+1):((sec_to_plot+1)*fs));
