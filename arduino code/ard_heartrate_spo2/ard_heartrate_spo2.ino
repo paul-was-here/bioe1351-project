@@ -39,12 +39,21 @@ byte readLED = 13; //Blinks with each data read
 void setup()
 {
   Serial.begin(230400); // initialize serial communication at 115200 bits per second:
+  Serial.flush();
+  while(!Serial);
+
+  Serial.println("\nSerial initd");
 
   pinMode(pulseLED, OUTPUT);
   pinMode(readLED, OUTPUT);
 
   // Initialize sensor
-  if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) //Use default I2C port, 400kHz speed
+  if (!particleSensor.begin(Wire, I2C_SPEED_STANDARD)) //Use default I2C port, 400kHz speed
+  // I2C_SPEED_FAST: 400kHz
+  // I2C_SPEED_STANDARD: 100kHz
+
+  // Try I2C speed slower? If capacitance of the wire is an issue maybe a slower speed will allow it to work?
+
   {
     Serial.println(F("MAX30105 was not found. Please check wiring/power."));
     while (1);
@@ -53,7 +62,7 @@ void setup()
   Serial.read();
 
   byte ledBrightness = 60; //Options: 0=Off to 255=50mA
-  byte sampleAverage = 4; //Options: 1, 2, 4, 8, 16, 32
+  byte sampleAverage = 2; //Options: 1, 2, 4, 8, 16, 32
   byte ledMode = 2; //Options: 1 = Red only, 2 = Red + IR, 3 = Red + IR + Green
   byte sampleRate = 100; //Options: 50, 100, 200, 400, 800, 1000, 1600, 3200
   int pulseWidth = 411; //Options: 69, 118, 215, 411
