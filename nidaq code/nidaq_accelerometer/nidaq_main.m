@@ -131,11 +131,11 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
             spo2 = ard_data(end);
             fprintf("\nSpO2 value: %.2f", spo2);
 
-            ppg_buffer = ard_data(1:(end-1));
+            ppg_buffer = -1 * ard_data(1:(end-1));
 
             % Local Arduino settings:
             ard_sample_rate = 100;               % Sampling rate 
-            ard_samples_per_value = 10;          % # samples averaged per value
+            ard_samples_per_value = 5;          % # samples averaged per value
             % something abt this is weird cause the arduino is set to avg 4
             % samples value so idk lol. with 10 the timing is accurate
             ard_fs = ard_sample_rate/ard_samples_per_value;
@@ -147,8 +147,9 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
             % Since we are retroactively receiving data from the past ~1s,
             % assign ard_readtime as the timestamp for the LAST value
 
-            ard_ts_buffer = [ard_ts_buffer, ts_ard];
-            ard_ppg_buffer = [ard_ppg_buffer, ppg_buffer];
+
+            %ard_ts_buffer = [ard_ts_buffer, ts_ard];
+            %ard_ppg_buffer = [ard_ppg_buffer, ppg_buffer];
 
             ppg_datasave = [ppg_datasave; [ts_ard(:) ppg_buffer(:)]];
             
@@ -162,12 +163,31 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
             %save(fname, 'ts_ard', 'ppg_buffer');
 
 
-            hr = getHeartrate(ts_ard, ppg_buffer);
-            fprintf("\nHeart rate: %.2f", hr)
+            %hr = getHeartrate(ts_ard, ppg_buffer);
+            %fprintf("\nHeart rate: %.2f", hr)
+            fprintf('Length ts_ard: %d, Length ppg_buffer: %d\n', length(ts_ard), length(ppg_buffer));
 
             yyaxis right;
+            cla(ax);
             plot(ax, ts_ard, ppg_buffer, 'r-'); hold on;
             ylim(ax, "tight");
+
+            hr = heartRateFcn(ts_ard, ppg_buffer);
+            fprintf("\nComputed heart rate: %.2f", hr);
+
+            %{
+            Heart rate seems accurate. maybe buffer 5-10 values and average
+            them? most of the time returns a bad read (NaN) but when it
+            returns a valid number, seems good.
+
+            remove plotting stuff from the algo script
+
+            add hard cutoffs <40 and >210 to return NaN
+
+            returns NaN even no noise- something is wrong.also doesn't plot
+            red and black lines
+            %}
+
             drawnow limitrate;
         catch ME
             fprintf("\n Error in arduino data acquisition");
@@ -185,18 +205,15 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
         ts_buffer = ts_buffer((fs+1):((sec_to_plot+1)*fs));
         acc_buffer = acc_buffer((fs+1):((sec_to_plot+1)*fs));
 
-        % Shift arduino data 75 over: (this probably won't work since the
-        % timing isn't consistent btw the two)
-        % could have an block that looks for the earliest time of the new plot and clears
-        % anything before that ? would this add excessive runtime?
-        ard_ts_buffer = ard_ts_buffer(75:end);
-        ard_ppg_buffer = ard_ppg_buffer(75:end);
+        %ard_ts_buffer = ard_ts_buffer(end-100:end);
+        %ard_ppg_buffer = ard_ppg_buffer(end-100:end);
         
         cla(ax);
         yyaxis left;
         plot(ax, ts_buffer, acc_buffer, 'b-');
-        yyaxis right;
-        plot(ax, ard_ts_buffer, ard_ppg_buffer, 'r-');
+        %yyaxis right;
+        %cla(ax);
+        %plot(ax, ard_ts_buffer, ard_ppg_buffer, 'r-');
     end
 end
 
@@ -224,20 +241,71 @@ function cadence = getCadence(ts, acc)
 end
 
 function hr = getHeartrate(ts, ppg)
-    % Calculate the heart rate in beats per minute
-    % Local vars:
-    thres_multiplier = 1;   % Threshold multiplier
+    % Reject noise and calculate a heartrate threshold
 
-    [b,a] = butter(3, 0.7/10/2, "high");
-
+    % Algorithm Settings:
+    noise_rejection_threshold =         3;
+    peak_detection_threshold =          2;
+    
+    % Filter operations:
+    [b,a] = butter(3, 0.5/10, "high");
     filt = filtfilt(b,a,ppg);
 
-    % lowpass filter? could that just do the job of the "drift correction"
+    upper_lim = noise_rejection_threshold*std(filt);
+    lower_lim = -1 * upper_lim;
 
-    % Peak detection:
-    thres = thres_multiplier * std(filt);
-    [pks, pkids] = findpeaks(filt, 'MinPeakProminence', thres);
-    hr = 60/mean(diff(ts(pkids)));
+    % Set ts to start at 0:
+    ts = ts - ts(1);
+
+    above_lim_idxs = find(ppg > upper_lim);
+    below_lim_idxs = find(ppg < lower_lim);
+
+    if isempty(above_lim_idxs) && isempty(below_lim_idxs)
+        [~, pkids] = findpeaks(filt, 'MinPeakProminence', ...
+            peak_detection_threshold*std(filt));
+        hr = 60/mean(diff(ts(pkids)));
+    else
+        left_noise_lim = min(above_lim_idxs(1), below_lim_idxs(1));
+        right_noise_lim = max(above_lim_idxs(end), below_lim_idxs(end));
+
+        if ts(left_noise_lim) > 2
+            % if we have at least 2s of no noise data to the left of the
+            % limit
+            ts = ts(1:left_noise_lim);
+            filt = filt(1:left_noise_lim);
+        elseif ts(end) - ts(right_noise_lim) > 2
+            % otherwise check if there are at least 2s of clean data to the
+            % right of the limit
+            ts = ts(right_noise_lim:end);
+            filt = filt(right_noise_lim:end);
+        else
+            hr = "Heart rate could not be computed.";
+            return
+        end
+        [~, pkids] = findpeaks (filt, 'MinPeakProminence', ...
+            peak_detection_threshold*std(filt));
+        hr = 60/mean(diff(ts(pkids))); 
+    end
+end
+
+function d = createHeartrateFilter(lower_fc, upper_fc)
+    % side note: should probably call this in one of the startup functions
+    % so that the filter object isn't being created EVERY time it needs to
+    % filter some data;
+
+    norm_fs = 10;               % Sampling rate
+
+    if isempty(lower_fc) || isempty(upper_fc)
+        lower_fc = 0.5;
+        upper_fc = 5;
+    end
+    
+    d = designfilt("bandpassiir", ...
+        FilterOrder =           3,...
+        HalfPowerFrequency1 =   lower_fc,...
+        HalfPowerFrequency2 =   upper_fc,...
+        SampleRate =            norm_fs...
+        );
 end
 
 
