@@ -9,6 +9,7 @@ function hr = heartRateFcn(ts, ppg)
     % Algorithm Settings:
     noise_rejection_threshold =         2.5;
     peak_detection_threshold =          1.5;
+    showPlot =                          true;            
     
     % Filter operations:
     [b,a] = butter(3, 0.4/20, "high");
@@ -16,7 +17,7 @@ function hr = heartRateFcn(ts, ppg)
     %filt = filt .* hann(length(filt));
 
 
-    plot(ts, filt, 'k-');
+    %plot(ts, filt, 'k-');
 
 
     upper_lim = noise_rejection_threshold*std(filt);
@@ -35,11 +36,13 @@ function hr = heartRateFcn(ts, ppg)
         [~, pkids] = findpeaks(filt, 'MinPeakProminence', ...
             peak_detection_threshold*std(filt));
         hr = 60/mean(diff(ts(pkids)));
-        plot(ts, filt, 'r-', LineWidth = 2);
-        yline(noise_rejection_threshold*std(filt), 'r');
-        yline(-noise_rejection_threshold*std(filt), 'r');
-        yline(peak_detection_threshold*std(filt), 'k--');
-        yline(-peak_detection_threshold*std(filt), 'k--');
+        if showPlot == true
+            plot(ts, filt, 'r-', LineWidth = 2);
+            yline(noise_rejection_threshold*std(filt), 'r');
+            yline(-noise_rejection_threshold*std(filt), 'r');
+            yline(peak_detection_threshold*std(filt), 'k--');
+            yline(-peak_detection_threshold*std(filt), 'k--');
+        end
 
         % Try FFT to compare even if no noise
         %{
@@ -121,11 +124,13 @@ function hr = heartRateFcn(ts, ppg)
                 
             %fprintf("\nHR (fft method): %.2f\n", fft_hr);
 
-            plot(ts, filt, 'r-', LineWidth = 2);
-            yline(noise_rejection_threshold*std(filt), 'r');
-            yline(-noise_rejection_threshold*std(filt), 'r');
-            yline(peak_detection_threshold*std(filt), 'k--');
-            yline(-peak_detection_threshold*std(filt), 'k--');
+            if showPlot == true
+                plot(ts, filt, 'r-', LineWidth = 2);
+                yline(noise_rejection_threshold*std(filt), 'r');
+                yline(-noise_rejection_threshold*std(filt), 'r');
+                yline(peak_detection_threshold*std(filt), 'k--');
+                yline(-peak_detection_threshold*std(filt), 'k--');
+            end
             return
     end
 end
