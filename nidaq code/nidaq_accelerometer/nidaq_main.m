@@ -14,6 +14,9 @@ acc_buffer = [];
 global ts_buffer;
 ts_buffer = [];
 
+global acceler_datasave;
+acceler_datasave = [];
+
 global ard_ts_buffer;
 ard_ts_buffer = [];
 global ard_ppg_buffer;
@@ -36,6 +39,7 @@ Function Definitions
 %}
 function daqSetup(fs, fc)
     global ppg_datasave;
+    global acceler_datasave;
 
     % Figure and filter Setup:
     [~, ax] = figSetup();                   % Get ax objects
@@ -43,12 +47,12 @@ function daqSetup(fs, fc)
 
     % NI DAQ Setup:
     d = daq("ni");                          % NI USB-6001 device
-    addinput(d,'Dev15','ai0','Voltage');     % ->Accelerometer x-data
-    addinput(d,'Dev15','ai4','Voltage');     % ->Accelerometer y-data
+    addinput(d,'Dev1','ai0','Voltage');     % ->Accelerometer x-data
+    addinput(d,'Dev1','ai4','Voltage');     % ->Accelerometer y-data
     d.Rate = fs;                            % Set sampling rate
 
     % Arduino Setup:
-    ard = serialport("COM4", 230400);       % Connected USB (Arduino)
+    ard = serialport("COM3", 230400);       % Connected USB (Arduino)
     configureTerminator(ard, "LF");
     flush(ard);
         
@@ -67,6 +71,7 @@ function daqSetup(fs, fc)
     stop(d)
     flush(d)
     save("saved_ppg_data.mat","ppg_datasave")
+    save("saved_acc_data.mat", "acceler_datasave")
 end
 
 function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
@@ -77,6 +82,7 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
     global starttime;
     global ard_ppg_buffer;
     global ard_ts_buffer;
+    global acceler_datasave;
 
     global ppg_datasave;
 
@@ -87,6 +93,8 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
         x_data = (data(:,1) - 3/2) ./ 0.42;
         y_data = (data(:,2) - 3/2) ./ 0.42;
         acc = sqrt(x_data.^2 + y_data.^2); 
+
+        acceler_datasave = [acceler_datasave; ts, x_data, y_data];
 
         % Filtering:
         persistent z;   % Persistent filter history variable (smooths data)
