@@ -9,3 +9,6 @@ nidaq code/nidaq_accelerometer/saved_ppg_data.mat
 .DS_Store
 arduino code/.DS_Store
 arduino code/.DS_Store
+*.mat
+*.asv
+*.png
