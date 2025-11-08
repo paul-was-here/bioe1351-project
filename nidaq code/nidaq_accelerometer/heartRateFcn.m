@@ -1,4 +1,4 @@
-function hr = heartRateFcn(ts, ppg)
+function hr = heartRateFcn(ts, ppg, d)
     % Reject noise and calculate a heartrate
     %
     % Inputs:   ts (Time vector)
@@ -7,15 +7,12 @@ function hr = heartRateFcn(ts, ppg)
     % Returns heartrate in BPM
 
     % Algorithm Settings:
-    noise_rejection_threshold =         2.5;
-    peak_detection_threshold =          1.5;
-    showPlot =                          true;            
+    noise_rejection_threshold =         2.5;   % in stdev's
+    peak_detection_threshold =          1.5;   % in stdev's 
+    showPlot =                          false; % for debug         
     
     % Filter operations:
-    [b,a] = butter(3, 0.4/20, "high");
-    filt = filtfilt(b,a,ppg);
-    %filt = filt .* hann(length(filt));
-
+    filt = filtfilt(d,ppg);
 
     %plot(ts, filt, 'k-');
 

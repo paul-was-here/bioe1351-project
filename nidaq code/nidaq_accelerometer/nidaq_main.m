@@ -44,22 +44,23 @@ function daqSetup(fs, fc)
     % Figure and filter Setup:
     [~, ax] = figSetup();                   % Get ax objects
     [b,a] = butter(3, fc/(fs/2), "low");    % Create filter coeffs
+    d_hr = designHeartRateFilter();
 
     % NI DAQ Setup:
     d = daq("ni");                          % NI USB-6001 device
-    addinput(d,'Dev1','ai0','Voltage');     % ->Accelerometer x-data
-    addinput(d,'Dev1','ai4','Voltage');     % ->Accelerometer y-data
+    addinput(d,'Dev15','ai0','Voltage');     % ->Accelerometer x-data
+    addinput(d,'Dev15','ai4','Voltage');     % ->Accelerometer y-data
     d.Rate = fs;                            % Set sampling rate
 
     % Arduino Setup:
-    ard = serialport("COM3", 230400);       % Connected USB (Arduino)
+    ard = serialport("COM4", 230400);       % Connected USB (Arduino)
     configureTerminator(ard, "LF");
     flush(ard);
         
     % Callback Setup
     sec_to_plot = 8;                        % Seconds to plot
     d.ScansAvailableFcnCount = fs/10;       % Effective plot refresh rate 
-    d.ScansAvailableFcn = @(src, evt) plotFcn(src, evt, ax, fs, b, a, ard, sec_to_plot);
+    d.ScansAvailableFcn = @(src, evt) plotFcn(src, evt, ax, fs, b, a, ard, sec_to_plot, d_hr);
     
     % Start Acquisition
     start(d, 'continuous');
@@ -74,7 +75,7 @@ function daqSetup(fs, fc)
     save("saved_acc_data.mat", "acceler_datasave")
 end
 
-function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
+function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot, d_hr)
     % Callback function for plotting when available
 
     global acc_buffer;
@@ -110,7 +111,11 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
         % Plotting:
         yyaxis left;
         plot(ax, ts, acc_filt, 'k-', LineWidth = 1.5); hold(ax, 'on');
-        xlim([ts_buffer(end-sec_to_plot*fs), ts_buffer(end)]);
+        if ts_buffer(end) < sec_to_plot
+            xlim([0 sec_to_plot])
+        else
+            xlim([ts_buffer(end-sec_to_plot*fs), ts_buffer(end)]);
+        end
         ylim("tight");
         drawnow limitrate;
     catch
@@ -138,7 +143,6 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
             ard_data = str2double(split(line, ','));
             ard_readtime = seconds(datetime("now") - starttime);
                     % consider correlation to NI DAQ timestamp instead
-
             % Receive ard data in the format: 
             % [ppg_buffer (array), spo2 (float)]
 
@@ -172,7 +176,7 @@ function plotFcn(src, ~, ax, fs, b, a, ard, sec_to_plot)
             plot(ax, ts_ard, ppg_buffer, 'r-'); hold on;
             ylim(ax, "tight");
 
-            hr = heartRateFcn(ts_ard, ppg_buffer);
+            hr = heartRateFcn(ts_ard, ppg_buffer, d_hr);
             fprintf("\nComputed heart rate: %.2f", hr);
 
             drawnow limitrate;
@@ -213,4 +217,18 @@ function [fig, ax] = figSetup()
     xlabel(ax, "Time (s)")
     ylabel(ax, "Acceleration (g's)")
     hold(ax, 'on');
+end
+
+function d_hr = designHeartRateFilter()
+    % Design a highpass filter for heartrate PPG data
+    % Returns digital filter object d_hr
+
+    Fs = 20;
+    Fc = 0.4;
+
+    d_hr = designfilt('highpassiir', ...
+        'FilterOrder', 3, ...
+        'HalfPowerFrequency', Fc, ...
+        'SampleRate', Fs, ...
+        'DesignMethod', 'Butter');
 end
