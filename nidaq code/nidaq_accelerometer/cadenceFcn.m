@@ -31,12 +31,18 @@ function cadence = cadenceFcn(ts, acc)
         [~, min_freq_idx] = min(abs(f - 0.5));
         [~, max_freq_idx] = min(abs(f-5));
         f_window = f(min_freq_idx:max_freq_idx);    % Adjust to frequency window of interest
-        f_order = sort(f_window, 'descend');        % Sort by descending frequency
+        amp_window = P1(min_freq_idx:max_freq_idx);
 
-        cadence = 60*f_order(1); % Assume most prominent frequency is the step
+        [sorted_amp, sort_idx] = sort(amp_window, 'descend');
+        sorted_freq = f_window(sort_idx);
+
+        top_freqs = sorted_freq(1:2);
+        top_amps = sorted_amp(1:2);
+
+        cadence = 60*top_freqs(1); % Assume most prominent frequency is the step
         
         % Assume second most prominent frequency in y is up-down bobbing
-        if f_order(2)/f_order(1) > 0.5
+        if top_amps(2)/top_amps(1) > 0.5
             fprintf("\nBobbing up and down detected: Attempt to reduce" + ...
                 "bobbing motion.")
         end
