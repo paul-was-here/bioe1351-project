@@ -35,11 +35,13 @@ function hr = heartRateFcn(ts, ppg, d)
         pre_hr = 60/mean(diff(ts(pkids)));
         hr = checkBounds(pre_hr);
         if showPlot == true
+            %{
             plot(ts, filt, 'r-', LineWidth = 2);
             yline(noise_rejection_threshold*std(filt), 'r');
             yline(-noise_rejection_threshold*std(filt), 'r');
             yline(peak_detection_threshold*std(filt), 'k--');
             yline(-peak_detection_threshold*std(filt), 'k--');
+            %}
         end
         return
     else
@@ -70,11 +72,13 @@ function hr = heartRateFcn(ts, ppg, d)
             pre_hr = 60/mean(diff(ts(pkids)));
             hr = checkBounds(pre_hr);
             if showPlot == true
+                %{
                 plot(ts, filt, 'r-', LineWidth = 2);
                 yline(noise_rejection_threshold*std(filt), 'r');
                 yline(-noise_rejection_threshold*std(filt), 'r');
                 yline(peak_detection_threshold*std(filt), 'k--');
                 yline(-peak_detection_threshold*std(filt), 'k--');
+                %}
             end
             return
     end
