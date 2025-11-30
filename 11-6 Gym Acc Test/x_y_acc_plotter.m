@@ -38,6 +38,18 @@ P1_good = P2_good(1:L_good/2+1);  % One-sided spectrum
 P1_good(2:end-1) = 2 * P1_good(2:end-1);
 f_good = fs * (0:(L_good/2)) / L_good;
 
+[~, max_f_good_idx] = max(P1_good);
+max_f_good = f_good(max_f_good_idx);
+fprintf("Max frequency good form: %d\n",max_f_good);
+
+P1_good_lowfreqs = P1_good(2:round(max_f_good_idx*3/4));
+[~, Second_f_good_idx] = max(P1_good_lowfreqs);
+Second_f_good = f_good(1+Second_f_good_idx);
+fprintf("Second frequency good form: %d\n",Second_f_good);
+
+ratio = P1_good_lowfreqs(Second_f_good_idx)/P1_good(max_f_good_idx);
+fprintf("Ratio: %d\n",ratio);
+
 x_bad = bad_window_y;
 L_bad = length(x_bad);
 Y_bad = fft(x_bad);
@@ -46,8 +58,18 @@ P1_bad = P2_bad(1:L_bad/2+1);
 P1_bad(2:end-1) = 2 * P1_bad(2:end-1);
 f_bad = fs * (0:(L_bad/2)) / L_bad;
 
-%P1_good = P1_good/max(P1_good);
-%P1_bad = P1_bad/max(P1_bad);
+[~, max_f_bad_idx] = max(P1_bad);
+max_f_bad = f_bad(max_f_bad_idx);
+fprintf("Max frequency bad form: %d\n",max_f_bad);
+
+P1_bad_lowfreqs = P1_bad(2:round(max_f_bad_idx*3/4));
+[~,Second_f_bad_idx] = max(P1_bad_lowfreqs);
+Second_f_bad = f_bad(2+Second_f_bad_idx);
+fprintf("Second frequency bad form: %d\n",Second_f_bad);
+
+ratio_bad = P1_bad_lowfreqs(Second_f_bad_idx)/P1_bad(max_f_bad_idx);
+fprintf("Ratio: %d\n", ratio_bad);
+
 
 figure(2);
 plot(f_good, P1_good, 'k-', LineWidth=1.5); hold on;
