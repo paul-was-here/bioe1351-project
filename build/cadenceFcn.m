@@ -8,7 +8,7 @@ function cadence = cadenceFcn(ts, acc)
     %
     % Note that input acc is pre-filtered in the main function.
 
-    detection_method = "fft";
+    detection_method = "peakprominence";
                 % Options: "fft" or "peakprominence"
 
     if detection_method == "peakprominence"
@@ -17,6 +17,11 @@ function cadence = cadenceFcn(ts, acc)
         cadence = 60/mean(diff(ts(pkids)));
         return
     elseif detection_method == "fft"
+        % i don't think the fft method was written correctly- it is updated
+        % in another fcn within the app itself anyways so this is probably
+        % obsolete.
+        %
+        %
         % Variables setup:
         L = length(acc);
         fs = length(acc)/(ts(end)-ts(1)); 
@@ -43,8 +48,8 @@ function cadence = cadenceFcn(ts, acc)
         
         % Assume second most prominent frequency in y is up-down bobbing
         if top_amps(2)/top_amps(1) > 0.5
-            fprintf("\nBobbing up and down detected: Attempt to reduce" + ...
-                "bobbing motion.")
+            %fprintf("\nBobbing up and down detected: Attempt to reduce" + ...
+            %    "bobbing motion.")
         end
 
     end
