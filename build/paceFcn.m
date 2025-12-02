@@ -10,7 +10,7 @@ function pace = paceFcn(ts, acc, baseline)
 
     intgrl = cumtrapz(acc);
     fit = polyfit(ts, intgrl, 1);
-    pace = baseline*fit(1);
+    pace = baseline/fit(1);
 end
 
 %{
