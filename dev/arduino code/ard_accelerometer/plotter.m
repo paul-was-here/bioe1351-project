@@ -9,13 +9,13 @@ Test bench for our cadence algorithm.
 fs=100;
 
 [b,a] = butter(3, 10/(fs/2));
-x = load("data.mat");
+x = load("Wrist_5min.mat");
 
 
-%ts = x.datasave(:,1);
-%acc = x.datasave(:,2) - 1.38;
-ts = x.ts-(x.ts(1));
-acc = x.acc - (mean(x.acc));
+ts = x.datasave(:,1);
+acc = x.datasave(:,2) - 1.38;
+%ts = x.ts-(x.ts(1));
+%acc = x.acc - (mean(x.acc));
 acc_filt = filtfilt(b,a,acc);
 
 figure();

@@ -12,3 +12,9 @@ arduino code/.DS_Store
 *.mat
 *.asv
 *.png
+
+/build/algo_test_branch/
+
+/build/old/
+
+/build/ds_test_branch/

@@ -7,12 +7,20 @@ Use this script to evaluate the accuracy of the algorithms designed in
 heartRateFcn.m.
 %}
 
-x = load('saved_ppg_data.mat');
+x = load('good form ppg.mat');
 figure()
+
+d = designfilt('highpassiir', ...
+                'FilterOrder', 3, ...
+                'HalfPowerFrequency', 0.4, ...
+                'SampleRate', 20, ...
+                'DesignMethod', 'Butter');
 
 for i = 1:100:length(x.ppg_datasave(:,1))
     ts = x.ppg_datasave(i:i+99, 1);
     ppg = x.ppg_datasave(i:i+99, 2);
+    
+    globalstep = ts(end);
 
     pause;
     cla;
@@ -23,11 +31,11 @@ for i = 1:100:length(x.ppg_datasave(:,1))
     cla;
     plot(ts, ppg, 'b-'); hold on;
     yyaxis left;
+
     
-    hr = heartRateFcn(ts, ppg);
-    fprintf("\nHR (peak detection method: %.2f\n\n\n", hr);
-    %disp(hr);
-    
+    hr = heartRateFcn(ts, ppg, d);
+    fprintf("\nHR (peak detection method: %.2f", hr);   
+    fprintf("\nGlobal step: %.2f\n\n", globalstep)
 end
 
 
