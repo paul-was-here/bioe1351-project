@@ -8,6 +8,10 @@ PantheRun aims to gamify the running workout experience by using the user's phys
 This combination of metrics is processed in real-time by a number of non-linear transformations, and the dimension is reduced by projection onto a game control space. All parameters, including the user's desired targets, along with transformation functions and coefficients are editable within the app or the code respectively.
 
 ## Use Instructions & Pin Connections
+**Hardware:**
+The PantheRun system is built on real-time data acquisition and 'online' processing via the use of a National Instruments DAQ device. Additionally, a second data stream from an Arduino device provides an I2C interface for a PPG breakout board.
+
+**Running the App:**
 1. Navigate to the /build/ directory and download all contents. Supporting scripts and assets are located in the same directory.
 2. Navigate to /build/arduino_setup/ and upload the sketch to the connected Arduino device.
 3. Run BIOENG_2351_Project.mlapp
