@@ -13,6 +13,11 @@ The PantheRun system is built on real-time data acquisition and 'online' process
 **Pinout:**  
 <img width="1987" height="932" alt="Scheme-it-export-1351-RunTrainer-Pinout-2025-12-07-13-36" src="https://github.com/user-attachments/assets/0b7bb310-84d9-412e-99f3-ac2ce94d07d9" />
 
+**Required Libraries:**  
+[MAX3010x Library by SparkFun](https://github.com/sparkfun/SparkFun_MAX3010x_Sensor_Library/tree/master) is required to interface with the PPG breakout board via I2C.  
+[MATLAB Signal Processing Toolbox](https://www.mathworks.com/products/signal.html)  
+[MATLAB Data Acquisition Toolbox](https://www.mathworks.com/products/data-acquisition.html)  
+[Data Acquisition Toolbox Support Package for National Instruments NI-DAQmx Devices](https://www.mathworks.com/matlabcentral/fileexchange/45086-data-acquisition-toolbox-support-package-for-national-instruments-ni-daqmx-devices)  
 
 **Running the App:**  
 1. Navigate to the /build/ directory and download all contents. Supporting scripts and assets are located in the same directory.
