@@ -10,6 +10,10 @@ This combination of metrics is processed in real-time by a number of non-linear 
 **Hardware:**  
 The PantheRun system is built on real-time data acquisition and 'online' processing via the use of a National Instruments DAQ device. Additionally, a second data stream from an Arduino device provides an I2C interface for a PPG breakout board.
 
+**Pinout:**  
+<img width="1987" height="932" alt="Scheme-it-export-1351-RunTrainer-Pinout-2025-12-07-13-36" src="https://github.com/user-attachments/assets/0b7bb310-84d9-412e-99f3-ac2ce94d07d9" />
+
+
 **Running the App:**  
 1. Navigate to the /build/ directory and download all contents. Supporting scripts and assets are located in the same directory.
 2. Navigate to /build/arduino_setup/ and upload the sketch to the connected Arduino device.
