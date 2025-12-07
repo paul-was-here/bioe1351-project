@@ -20,11 +20,9 @@ The PantheRun system is built on real-time data acquisition and 'online' process
 [Data Acquisition Toolbox Support Package for National Instruments NI-DAQmx Devices](https://www.mathworks.com/matlabcentral/fileexchange/45086-data-acquisition-toolbox-support-package-for-national-instruments-ni-daqmx-devices)  
 
 **Running the App:**  
-1. Navigate to the /build/ directory and download all contents. Supporting scripts and assets are located in the same directory.
-2. Navigate to /build/arduino_setup/ and upload the sketch to the connected Arduino device.
-3. Run BIOENG_2351_Project.mlapp
-
-Other directories within the repository hold old builds or development tools.
+1. [Download](https://github.com/paul-was-here/bioe1351-project/archive/refs/heads/main.zip) the main branch from this GitHub repository.
+2. Download and install required libraries (above).
+3. Extract the downloaded .zip file and run BIOENG_2351_Project.mlapp from within.  
 
 
 ### BIOENG 1351/2351: Biosignal Acquisition & Analysis  
